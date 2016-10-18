@@ -1,0 +1,99 @@
+---
+title: "My First Project"
+author: "Cephas Dube"
+date: "19 September 2016"
+output: word_document
+---
+# Loading the necessary packages to compile Project
+```{r}
+library(dplyr)
+library(readr)
+library(tidyr)
+library(lubridate)
+library(knitr)
+library(ggplot2)
+library(dplyr)
+```
+
+
+
+# Getting Raw Data into Project
+```{r}
+eqs_file <- list.files(path = "G:/Cephas/Rproject/Files.csv", full.names = TRUE) %>% lapply(read.csv) %>% bind_rows()
+
+
+
+```
+
+# Getting the 20 largest MarketCapUSD stocks(LMC)
+
+```{r}
+
+LMC <- eqs_file %>% group_by(date) %>% select(Ticker, MarketCapUSD) %>% arrange(desc(MarketCapUSD)) %>% slice(1:20) %>% ungroup()
+
+
+```
+
+# Displaying columns in a table ranked by MarketCapUSD
+
+```{r}
+F_month <- eqs_file %>% filter(date == ymd("2016-01-31")) %>% select(date,Ticker, MarketCapUSD) %>% arrange(desc(MarketCapUSD))
+
+T_1 <- kable(F_month, results='asis')
+
+```
+
+# Creating dataframe with Z-score for the BookYield column for the first month
+
+```{r}
+Z_BYield <- eqs_file %>% filter(date == ymd("2016-01-31")) %>% mutate(BookYield_z = (BookYield-mean(BookYield, na.rm = TRUE))/sd(BookYield, na.rm = TRUE)) %>% select(date, Ticker,BookYield_z)
+
+T_2 <- kable(Z_BYield, digits = 2, results = 'asis')
+
+```
+
+# Calculating Z-score for the BookYield column for every month
+
+```{r}
+
+Z_BY <- eqs_file %>% group_by(date) %>% mutate(BYZ = (BookYield-mean(BookYield, na.rm = TRUE))/sd(BookYield, na.rm = TRUE)) %>% ungroup()
+
+```
+
+# Getting 10 stocks with highest BookYield Z-Score in each month
+
+```{r}
+HBY_z <- Z_BY %>% group_by(date) %>% arrange(desc(BYZ)) %>% slice(1:10) %>% ungroup()
+
+```
+
+# Calculating the Market Cap Weighted weight for the 10 stocks above
+
+```{r}
+MktCap_weighted <- HBY_z %>% group_by(date) %>% mutate(MCap_weighted = (MarketCapUSD)/sum(MarketCapUSD, na.rm = TRUE)) %>% ungroup()
+
+```
+
+# Calculating the EarningsYield for the Cap-Weighted portfolio
+
+```{r}
+
+EY_P <- MktCap_weighted %>% group_by(date) %>% summarise(EYield_p =sum(EarningsYield * MCap_weighted, na.rm = TRUE)) %>% ungroup()
+                                              
+T_3 <- kable(EY_P, digits = 2,results = 'asis')
+
+```
+
+# Plotting bar chart for BYZ
+
+```{r}
+
+BarChart <- Z_BY %>% group_by(date) %>% filter(date == ymd("2016-01-31")) %>% select(Ticker,BYZ) %>% ggplot(mapping = aes(x = Ticker, y = BYZ)) + geom_bar(stat = "identity", width = 2) + coord_flip()
+```
+
+# Plotting timeseries of Cap Weighted Portfolio EarningsYield
+
+```{r}
+CapWeighted_P <- ggplot(data = EY_P) + geom_line(mapping = aes(x = date, y = EYield_p, group = 1))
+
+```
